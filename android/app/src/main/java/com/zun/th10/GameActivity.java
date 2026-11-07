@@ -19,8 +19,8 @@ import org.libsdl.app.SDLActivity;
  * plain Android views on top of SDL's SurfaceView, because drawing UI in the
  * ported renderer would mean adding a whole 2D path to it.
  *
- *   ≡  sends Escape to the game for a few frames (pause / back / cancel)
- *   ✕  ends the activity (the game writes saves as it goes, so this is safe)
+ *   pause button  sends Escape to the game for a few frames (pause / back / cancel)
+ *   quit button   ends the activity (the game writes saves as it goes)
  *
  * Four-finger tap also sends Escape (see TouchController in the engine); the
  * buttons exist because that gesture is unusable mid-dodge.
@@ -28,6 +28,17 @@ import org.libsdl.app.SDLActivity;
 public class GameActivity extends SDLActivity {
     /** Called from Java: queue an Escape key press for the game. */
     private static native void nativeTapEsc();
+
+    /**
+     * Guard for the (unlikely) case that the native libraries failed to load:
+     * an UnsatisfiedLinkError from a button press would otherwise crash the app.
+     */
+    private static void tapEsc() {
+        try {
+            nativeTapEsc();
+        } catch (Throwable ignored) {
+        }
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -42,11 +53,11 @@ public class GameActivity extends SDLActivity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button esc = overlayButton("≡");
+        Button esc = overlayButton("\u2261");   // identical-to: a "menu" glyph
         esc.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { nativeTapEsc(); }
+            @Override public void onClick(View v) { tapEsc(); }
         });
-        Button quit = overlayButton("✕");
+        Button quit = overlayButton("\u2715");  // multiplication x
         quit.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { requestFinish(); }
         });
@@ -93,7 +104,7 @@ public class GameActivity extends SDLActivity {
     /** Back is the game's Escape: pause, back out of a menu, cancel a dialog. */
     @Override
     public void onBackPressed() {
-        nativeTapEsc();
+        tapEsc();
     }
 
     private int dp(int value) {
