@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Flat dark theme for the launcher; the game activity runs fullscreen with
+         its own window style. -->
+    <style name="Theme.Th10" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF101014</item>
+        <item name="android:statusBarColor">#FF101014</item>
+        <item name="android:navigationBarColor">#FF101014</item>
+        <item name="android:colorAccent">#FF8AB4F8</item>
+    </style>
+</resources>
