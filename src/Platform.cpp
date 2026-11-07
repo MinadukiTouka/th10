@@ -4,6 +4,9 @@
 #include <ctime>
 #include <sys/stat.h>
 #include <SDL.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 namespace th10::host {
 Paths& paths(){static Paths p;return p;}
@@ -60,6 +63,11 @@ void locate_data(int argc,char** argv){
 void log(const char* fmt,...){
     va_list ap;va_start(ap,fmt);char line[1024];std::vsnprintf(line,sizeof line,fmt,ap);va_end(ap);
     std::fprintf(stderr,"%s\n",line);
+#ifdef __ANDROID__
+    // stderr is not guaranteed to reach logcat from a native thread; tag the
+    // lines so `adb logcat -s th10` shows the whole startup sequence.
+    __android_log_write(ANDROID_LOG_INFO,"th10",line);
+#endif
     if(log_file){std::fprintf(log_file,"%s\n",line);std::fflush(log_file);}
 }
 bool exists(const std::string& path){struct stat st;return stat(path.c_str(),&st)==0;}

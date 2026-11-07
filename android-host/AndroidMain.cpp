@@ -25,6 +25,7 @@
 #include "../portable/input/TouchController.hpp"
 
 #include <SDL.h>
+#include <GLES3/gl3.h>
 #include <jni.h>
 
 #include <algorithm>
@@ -130,6 +131,29 @@ void fatal(const std::string& message){
     SDL_Quit();
 }
 
+// One-shot environment dump. The first device log should answer "which data,
+// which GPU, which audio driver, which font" without needing another build.
+void log_diagnostics(){
+    const auto& p=host::paths();
+    for(const char* name:{"th10.dat","thbgm.dat","msgothic.ttc","scoreth10.dat","th10.cfg"}){
+        const auto path=p.data_file(name);
+        FILE* f=std::fopen(path.c_str(),"rb");
+        if(!f){host::log("data: %-13s missing",name);continue;}
+        std::fseek(f,0,SEEK_END);const long size=std::ftell(f);std::fclose(f);
+        host::log("data: %-13s %ld bytes",name,size);
+    }
+    if(const auto* vendor=reinterpret_cast<const char*>(glGetString(GL_VENDOR)))
+        host::log("gl vendor: %s",vendor);
+    if(const auto* renderer=reinterpret_cast<const char*>(glGetString(GL_RENDERER)))
+        host::log("gl renderer: %s",renderer);
+    if(const auto* version=reinterpret_cast<const char*>(glGetString(GL_VERSION)))
+        host::log("gl version: %s",version);
+    host::log("audio driver: %s",SDL_GetCurrentAudioDriver()?SDL_GetCurrentAudioDriver():"(none)");
+    int dw=0,dh=0;
+    if(auto* r=sdl_renderer())SDL_GL_GetDrawableSize(r->sdl_window(),&dw,&dh);
+    host::log("drawable: %dx%d",dw,dh);
+}
+
 // Touch coordinates arrive normalised; the game wants 640x480 picture space,
 // which is pillarboxed inside the drawable (Renderer::picture).
 void touch_event(const SDL_Event& e){
@@ -178,8 +202,10 @@ int main(int,char**){
     for(auto& k:keyboard_map)k.native=SDL_GetScancodeFromName(k.sdl);
 
     u32 seed=u32(std::time(nullptr));
+    host::log("th10-android: starting (seed %u)",seed);
     Application* app=open_game(seed);
     if(!app){fatal(failure);return 1;}
+    log_diagnostics();
 
     constexpr double interval=touhou::sdl::FrameCadence::interval;
     double debt=0,previous=host::seconds(),audio_remainder=0;
