@@ -124,10 +124,26 @@ void android_finish(){
     env->DeleteLocalRef(activity);
 }
 
+// Surface a startup failure on the device screen (Toast) as well as in the log.
+void android_show_error(const std::string& message){
+    JNIEnv* env=static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
+    jobject activity=static_cast<jobject>(SDL_AndroidGetActivity());
+    if(!env||!activity)return;
+    jclass cls=env->GetObjectClass(activity);
+    jmethodID method=env->GetMethodID(cls,"showErrorAndFinish","(Ljava/lang/String;)V");
+    if(method){
+        jstring text=env->NewStringUTF(message.c_str());
+        env->CallVoidMethod(activity,method,text);
+        if(text)env->DeleteLocalRef(text);
+    }
+    env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(activity);
+}
+
 void fatal(const std::string& message){
     host::log("fatal: %s",message.c_str());
     session.reset();
-    android_finish();
+    android_show_error(message);
     SDL_Quit();
 }
 

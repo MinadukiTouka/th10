@@ -1,6 +1,8 @@
 package com.zun.th10;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -8,6 +10,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import org.libsdl.app.SDLActivity;
 
@@ -98,6 +101,22 @@ public class GameActivity extends SDLActivity {
     public void requestFinish() {
         runOnUiThread(new Runnable() {
             @Override public void run() { finish(); }
+        });
+    }
+
+    /**
+     * Called from the native thread when startup fails (missing th10.dat, no GL
+     * context, ...). Shows the reason and leaves a couple of seconds for it to be
+     * read before the activity closes; the same text is in logcat under "th10".
+     */
+    public void showErrorAndFinish(final String message) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Toast.makeText(GameActivity.this, message, Toast.LENGTH_LONG).show();
+                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override public void run() { finish(); }
+                }, 2500);
+            }
         });
     }
 
