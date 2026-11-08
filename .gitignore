@@ -22,3 +22,17 @@ th10_save*
 replay_save/
 *.wav
 snapshot/
+
+# --- android port (com.zun.th10) ---
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/app/.cxx/
+libs/
+obj/
+local.properties
+*.apk
+*.aab
+*.iml
+.idea/
