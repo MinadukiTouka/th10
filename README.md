@@ -6,7 +6,7 @@ clean-room C++ 重写）的 fork，新增了 **Android 后端**：SDL2 + OpenGL 
 自用包两种构建。包名 `com.zun.th10`。
 
 - 构建：`ndk-build`（SDL2 + FreeType + 游戏 + host）→ Gradle → 签名 APK。
-  构建脚本与移植文档在工作区（不在本仓库）：`docs/`、`scripts/`、`tools/`。
+  Windows 便携工具链（NDK r27b + Gradle 9.8.2 + JDK 17）；这套工具链上的 CMake 配 C++ 会崩，所以原生层走 ndk-build。
 - 数据：公开包不含 `th10.dat` / `thbgm.dat`，由玩家自备，放到
   `/sdcard/Download/th10/` 或 `/sdcard/Android/data/com.zun.th10/files/th10/`。
 - 触屏：按住拖动移动并射击，第二指低速；Bomb = 优势手一侧的黑边（右手右侧 /
