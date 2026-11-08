@@ -1,169 +1,98 @@
-# 東方風神録 Android 移植（本 fork 的改动）
+# 东方风神录 Android 移植（TH10 / Mountain of Faith 1.00a）
 
-本仓库是 saekaze/th10-switch（Switch 原生移植，上游是 YomotsuHisami/th10 的
-clean-room C++ 重写）的 fork，新增了 **Android 后端**：SDL2 + OpenGL ES 3、
-触屏手势、`Download/th10` 数据目录、内置字体、启动器，以及公开包 / `-full`
-自用包两种构建。包名 `com.zun.th10`。
+非官方、非盈利的 Android 移植，基于 [saekaze/th10-switch](https://github.com/saekaze/th10-switch)
+（Switch 原生移植，游戏逻辑来自 [YomotsuHisami/th10](https://github.com/YomotsuHisami/th10)
+的 clean-room C++ 重写）。上游 Switch 的说明保留在 [README-switch.md](README-switch.md)。
 
-- 构建：`ndk-build`（SDL2 + FreeType + 游戏 + host）→ Gradle → 签名 APK。
-  Windows 便携工具链（NDK r27b + Gradle 9.8.2 + JDK 17）；这套工具链上的 CMake 配 C++ 会崩，所以原生层走 ndk-build。
-- 数据：公开包不含 `th10.dat` / `thbgm.dat`，由玩家自备，放到
-  `/sdcard/Download/th10/` 或 `/sdcard/Android/data/com.zun.th10/files/th10/`。
-- 触屏：按住拖动移动并射击，第二指低速；Bomb = 优势手一侧的黑边（右手右侧 /
-  左手左侧，可在启动器里切换）；≡ / 圆形 Esc / Back 键都是 Esc，没有退出按钮。
-- 许可：游戏与平台代码 MIT（见 `LICENSE-YomotsuHisami.txt`），Switch 专属文件 CC0；
-  本 Android 后端同样以 MIT 提供。**不包含任何原版游戏数据。**
+包名 **`com.zun.th10`**，只读取你自己合法持有的 `th10.dat` / `thbgm.dat`，
+**仓库与公开 APK 均不包含任何游戏数据**。
 
----
-# Touhou 10: Mountain of Faith — Nintendo Switch Port
-*(東方風神録　〜 Mountain of Faith)*
+## 特性
 
-![Platform](https://img.shields.io/badge/Platform-Nintendo%20Switch-e60012?style=for-the-badge&logo=nintendoswitch&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Fully%20Playable-brightgreen?style=for-the-badge)
-![License](https://img.shields.io/badge/Port%20Code-CC0%201.0-blue?style=for-the-badge)
+- **触控**：任意位置拖动移动（模拟量位移，方向跟手、斜向不减速，滑到两侧黑边也不断），
+  按住即射击（松手后 180 ms 尾）、第二根手指低速、菜单滑动/点按/双指返回
+- **Bomb**：点优势手一侧的黑边（右手右侧 / 左手左侧），4:3 没有余边时不启用
+- **惯用手切换**：右手（Esc 左上 / Bomb 右侧）或左手（Esc 右上 / Bomb 左侧），在启动器里切换
+- **Esc**：细「≡」与圆形「Esc」两个按钮都等于键盘 Esc，Back 键同 Esc；**没有退出按钮**，
+  离开游戏用 Home
+- **中文启动器**：数据检查、权限入口、惯用手设置均为简体中文（游戏内文本保持原版日文）
+- **字体内置**：公开包装带 `msgothic.ttc`，不需要系统字体
+- **60 fps 固定节奏**：在 90 Hz / 120 Hz 屏上请求并锁定 60 Hz
+- 图标取自原版 `th10.exe`；存档、BGM、暂停菜单均已验证
 
-A native homebrew port of ZUN's 2007 bullet hell danmaku classic **Touhou 10: Mountain of Faith** for the **Nintendo Switch** (Horizon OS).
+## 安装（游戏数据手动放置）
 
-Mountain of Faith is my favourite Touhou game, so it gets the port it deserves. This build runs the clean C++ reimplementation from [YomotsuHisami/th10](https://github.com/YomotsuHisami/th10), compiled directly to native ARM64 and driven by an SDL2 host on an OpenGL ES 3 context — no WebAssembly layer, no Linux, Box64 or Wine involved.
+1. 自备正版《东方风神录》1.00a，取出 `th10.dat` 与 `thbgm.dat`
+2. 放到下面任一目录（文件名保持原样）：
+   - **`Download/th10/`** —— 首次打开时在启动器里授予 **「所有文件访问」**
+   - **`/sdcard/Android/data/com.zun.th10/files/th10/`** —— 不需要任何权限，可直接 `adb push`
+3. 安装 APK（Android 8.0+，arm64-v8a）
+4. 启动器显示「已找到游戏数据」后点「开始游戏」
 
-Because the game logic is a clean reimplementation rather than a decompiled EXE, this port has **none of the bad-decompile bugs**
+`thbgm.dat` 缺失时游戏仍可运行，只是没有 BGM。
 
-Companion to the [Touhou Switch ports](https://github.com/saekaze/touhou-switch), with the same `touhou10.nro` + `sd:/switch/touhou/touhou10/` layout.
+## 操作方式
 
----
+### 触屏
 
-## 🆕 What's New in 1.00a-r6
+| 操作 | 作用 |
+| --- | --- |
+| 任意位置**拖动** | 自机跟手移动（模拟量 1:1，斜向不减速） |
+| 按住 | 射击（松手后 180 ms 内继续射击） |
+| **第二根手指**按住 | 低速（Focus） |
+| 点**优势手一侧黑边** | 放 Bomb（右手右侧 / 左手左侧） |
+| **≡** 或圆形 **Esc** | 暂停 / 返回 / 取消（等同键盘 Esc） |
+| 菜单里滑动 / 点按 / 双指点击 | 移动光标 / 确认 / 返回 |
+| 对话 | 点按推进，按住 0.5 秒跳过 |
 
-* 🚀 **Native build, much faster:** the game code is now compiled straight to ARM64 instead of going through a WebAssembly layer. In the heaviest spell cards the game's own work per frame is about **60% lower**, the hardest moments run about **33% faster** when fast-forwarding a replay, and the frame drops in busy boss fights are gone.
-* 🔋 **Stock CPU clock:** r6 runs at the Switch's normal CPU speed (r5 asked for 1785 MHz) and is still faster.
-* 🕒 **Stays smooth in long sessions:** memory use and frame cost stay flat through long play with many restarts, returns to the title and character changes.
-* 💾 **Nothing to migrate:** same folder, same `th10.cfg`, `scoreth10.dat` and replays, same controls. Just replace `touhou10.nro`.
+启动器 →「触屏惯用手」可切换 **右手**（Esc 左上、Bomb 右黑边）或 **左手**（Esc 右上、Bomb 左黑边）。
 
----
+### 键盘
 
-## ✨ Key Features
+方向键移动，`Z` 射击，`X` Bomb，`Shift` 低速，`Esc` 暂停，`Back` 同 Esc。
 
-* ⬛ **OLED-Friendly Pillarboxing:** the original 640×480 playfield is centred with pure black (`#000000`) bars and an aspect-correct upscale.
-* 🔊 **Full Audio:** sound effects plus BGM streamed from `thbgm.dat`, mixed with miniaudio and played through SDL.
-* 🎮 **Sane, Remappable Controls:** Joy-Con (handheld, grip, detached) and Pro Controller with the same default layout as every other Touhou Switch port (B shoot, A bomb, L/ZL focus, R/ZR skip, + pause); the in-game **Key Config** can rebind them.
-* 🌏 **Language-Aware Title:** hbmenu shows the original Japanese title (`東方風神録　～ Mountain of Faith`) on consoles set to 日本語 and the romanised one everywhere else, filled across all 16 NACP language slots.
-* 💾 **Saves Next to the Data:** `th10.cfg`, `scoreth10.dat`, replays (`replay/th10_01.rpy` …) and snapshots are written into the same SD folder the game loaded from. Without `msgothic.ttc`, the port falls back to the Switch shared system fonts.
+## 构建
 
----
+- 原生层：`ndk-build`（SDL2 2.32.10 + FreeType 2.15.0 + 游戏 + host）→ `libmain.so`
+- 打包：Gradle 9.8.2 + AGP 9.4.1 + JDK 17，NDK r27b，minSdk 26 / target 36，arm64-v8a
+- 这台构建机上 CMake 配置 C++ 工程会崩（`0xC0000409`），所以原生层走 ndk-build
+- 版本：`1.0.2`
 
-## 📥 Installation Guide
+## 两个构建
 
-> ⚠️ **Disclaimer:** In compliance with ZUN's guidelines and copyright law, this repository contains **ONLY the homebrew engine code**. No game assets are distributed. You must legally own a copy of *Touhou 10: Mountain of Faith v1.00a*.
+| 构建 | 内置 | 大小 |
+| --- | --- | --- |
+| 公开包 `th10-1.0.2-android-apk.apk` | 只有 `msgothic.ttc` | 约 14 MB |
+| 自用包 `th10-1.0.2-android-apk-full.apk` | 字体 + `th10.dat` + `thbgm.dat` | 约 425 MB，**不发布、不外传** |
 
-### 1. SD Card File Structure
+`-full` 包首次点「开始游戏」会把内置数据解包到应用目录（约 3 秒），之后正常走文件系统。
 
-1. Ensure your Nintendo Switch is running custom firmware (Atmosphère CFW).
-2. Download the latest `touhou10.nro` from the [Releases](../../releases) tab (or build from source).
-3. Create the folder `sd:/switch/touhou/touhou10/` and copy the following into it:
+## 已验证设备
 
-```text
-sd:/switch/touhou/touhou10/
-    ├── touhou10.nro          # Nintendo Switch homebrew executable
-    ├── th10.dat              # Main game archive (v1.00a)
-    ├── thbgm.dat             # Background music archive
-    └── msgothic.ttc          # Japanese font (ships with the Windows release)
-```
+| 设备 | 系统 | 结果 |
+| --- | --- | --- |
+| OnePlus PJE110 | Android 16，120 Hz 面板 | 60 fps、触控与黑边拖动、左右手 Bomb、Esc/Back、存档、BGM 正常 |
 
-`thbgm.dat` is optional (the game runs silent without it); `msgothic.ttc` is recommended for the most faithful text, with the console system fonts as fallback.
+## 免责声明 / Disclaimer / 免責事項
 
-**Recommended place: `sd:/switch/touhou/touhou10/`.** Keeping every Touhou port in one `sd:/switch/touhou/` folder (`touhou6`, `touhou7`, `touhou8` …) is much tidier than a separate folder per game. Other places still work: the port first looks in its own folder (wherever the NRO is), then for a `th10` / `touhou10` folder (any capitalisation) directly on the SD card, in `switch/`, `touhou/`, `switch/touhou/`, `games/` or `roms/`. If `th10.dat` isn't found anywhere, the port shows where it looked instead of closing.
+**中文**：本项目为非官方、非盈利的技术研究项目，与上海爱丽丝幻乐团及 ZUN 无任何关联。
+《东方风神录 ～ Mountain of Faith.》的著作权归上海爱丽丝幻乐团及 ZUN 所有。
+本项目不包含任何原版游戏数据；使用者必须合法持有原作，仅在个人、非商业环境中使用；
+不得以任何形式分发原版游戏数据。
 
-### 2. Launching
+**English**: This is an unofficial, non-commercial fan project, not affiliated with Team Shanghai
+Alice or ZUN. Touhou 10 and all game assets belong to Team Shanghai Alice. This repository and its
+public APKs contain no game data: you must own a legitimate copy and use it for personal,
+non-commercial purposes only. Never redistribute the original data files.
 
-Run `touhou10.nro` from the **Homebrew Menu (hbmenu)**, **Sphaira launcher**, or a home screen forwarder.
+**日本語**：本プロジェクトは非公式・非営利の技術研究プロジェクトであり、上海アリス幻樂団および
+ZUN とは一切関係ありません。『東方風神録 ～ Mountain of Faith.』の著作権は上海アリス幻樂団に
+帰属します。本リポジトリと公開 APK にはゲームデータを含みません。正規品を所有する個人が
+非営利で利用する場合に限ります。ゲームデータの再配布は禁止です。
 
----
+## 许可与致谢
 
-## 🕹 Controls
-
-| Nintendo Switch Button | Action |
-| :--- | :--- |
-| **Left Stick / D-Pad** | Character Movement |
-| **B** | Shoot / Confirm |
-| **A** | Bomb / Cancel |
-| **L / ZL** | Focus (Precision Slow-Motion Movement) |
-| **R / ZR** | Skip Dialogue (hold) |
-| **+ (Plus)** | Pause / In-Game Menu |
-| **X** | Enter (while not bound in Key Config) |
-| **Y** | Retry (while not bound in Key Config) |
-| **− (Minus)** | Screenshot (saved next to the game data) |
-
-**The same default layout in every Touhou Switch port:** B shoots, A bombs, L/ZL focuses, R/ZR skips dialogue, + pauses. These are only defaults — the Switch buttons act as the game's own gamepad, so the in-game **Key Config** can rebind them, and **Default** there brings this layout back. The D-Pad and sticks only move — they can never be picked as a button. Key Config numbers: 0 B, 1 A, 2 L/ZL, 3 +, 4 R/ZR, 5 X, 6 Y.
-
----
-
-## 🛠 Building from Source
-
-### Automated Build (GitHub Actions)
-
-This repository includes a CI pipeline (`.github/workflows/build-switch.yml`; a copy also lives in `scripts/`). Push or fork the repository and the workflow compiles `touhou10.nro` inside the official `devkitpro/devkita64` container, uploading it as a downloadable artifact. Tagging `v*` additionally publishes it as a release asset.
-
-### Local Build (Linux / macOS / WSL)
-
-1. Install [devkitPro](https://devkitpro.org/wiki/Getting_Started) with `devkitA64` and `libnx`.
-2. Install the required Switch portlibs:
-
-   ```bash
-   sudo dkp-pacman -Syu
-   sudo dkp-pacman -S switch-dev switch-mesa switch-libdrm_nouveau switch-sdl2 switch-freetype switch-libpng switch-bzip2 switch-zlib switch-harfbuzz
-   ```
-
-3. Build:
-
-   ```bash
-   export DEVKITPRO=/opt/devkitpro
-   ./scripts/build_switch.sh
-   ```
-
-   The result is `build-switch/touhou10.nro`.
-
-A desktop Linux build of the same sources (SDL2 + GLES 3) and its host tests:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
-xvfb-run -a build/th10_host_tests
-build/touhou10 /path/to/th10-data
-```
-
-The Linux build can also play a scripted input file with a fixed seed and save screenshots (`TH10_SCRIPT`, `TH10_SEED`, `TH10_SHOTS`; see the comment in `src/main.cpp`), which is how the port is checked frame by frame.
-
----
-
-## 📂 How It Works
-
-The game logic is upstream's architecture-independent C++, built natively with `TH_NATIVE_PLATFORM` (typed graphics calls instead of the browser's Direct3D-style device). Upstream targets 32-bit pointers (the original EXE is x86, the web build wasm32); the port keeps the game's file formats and save data byte-identical on 64-bit ARM. A 32-bit build of the same sources renders every frame pixel-identically and writes the same `scoreth10.dat`.
-
-| Path | Purpose |
-| :--- | :--- |
-| `game/` | YomotsuHisami's reconstruction of the original game code |
-| `platform/` | upstream's platform layer (application flow, title, world, audio, fonts) |
-| `rebuild/` | x87 80-bit float emulation (Berkeley SoftFloat) for bit-exact replays |
-| `portable/` | shared GLES 3 renderer, input mapping and numeric helpers |
-| `src/main.cpp` | startup, vsync-paced frame loop, Switch buttons and touch screen |
-| `src/FileHost.cpp` | `th10.dat` / `thbgm.dat` access and the SD save folder |
-| `src/GraphicsHost.cpp` | textures, render targets and draws on the GLES renderer |
-| `src/AudioHost.cpp` | DirectSound-style buffers on miniaudio + SDL audio |
-| `src/FontHost.cpp` | CP932/GBK text via FreeType (MS Gothic or the Switch system font) |
-| `platform/switch/icon.jpg` | 256×256 NRO icon (the original game cover) |
-| `scripts/build_switch.sh` | one-shot Switch build |
-| `scripts/nacp_lang.py` | Japanese NACP title slot |
-| `tests/test_host.cpp` | host tests (files, fonts, audio, renderer) |
-
-`th10-switch.log` in the data folder gets a timing line every 600 played frames (`step` = the game's CPU work, `present` = GPU and vsync, in ms per frame), useful when reporting slowdowns.
-
----
-
-## 🤝 Credits & Acknowledgments
-
-* **ZUN / Team Shanghai Alice** — original creator and developer of the Touhou Project series.
-* **[YomotsuHisami](https://github.com/YomotsuHisami/th10)** — the clean-room TH10 C++ reimplementation this port is built on.
-* **John R. Hauser** — Berkeley SoftFloat. **David Reid** — miniaudio.
-* **Switchbrew & devkitPro Team** — the open-source `libnx` SDK and Switch toolchain.
-* Port developed with AI assistance.
-
-**Licensing:** the Switch-only files (`scripts/`, `platform/switch/`, `tests/`, build files) are CC0 1.0 (see `LICENSE`). The game and platform code (`game/`, `platform/`, `portable/`, `rebuild/machine.hpp`) and the hosts in `src/`, which are adapted from upstream's SDL host, come from YomotsuHisami and are under the **MIT** licence ([confirmed by the author](https://github.com/YomotsuHisami/th10/issues/3)), not `LICENSE` (see [`LICENSE-YomotsuHisami.txt`](LICENSE-YomotsuHisami.txt)). Berkeley SoftFloat (`rebuild/third_party/softfloat.c`) is BSD-3-Clause and miniaudio / stb (`portable/sdl/third_party/`) are public domain or MIT-0; see their file headers.
+- 代码：**MIT**（游戏逻辑重写来自 YomotsuHisami / Ritosa2333 的 th10；`saekaze/th10-switch`
+  的 Switch 专属文件为 CC0 1.0；本 Android 后端同样以 MIT 提供）
+- 依赖：SDL2（zlib 许可）、FreeType（FTL / GPLv2 双许可）、miniaudio / stb（public domain / MIT-0）
+- 游戏文本与素材：Team Shanghai Alice / ZUN
