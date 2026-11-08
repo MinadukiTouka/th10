@@ -95,6 +95,7 @@ touhou::input::TouchController gestures;
 std::set<int> fingers;              // currently down pointer ids
 std::uint32_t bomb_serial=0, escape_serial=0;
 double fire_until=0;                // release grace, seconds on host::seconds()
+int bomb_side=1;                    // +1 right black bar (right-handed), -1 left bar
 
 touhou::input::TouchState touch_state(){
     touhou::input::TouchState s;if(!session||!session->app)return s;u32 raw[8];application_touch_state(session->app,raw);float values[5];std::memcpy(values,raw+3,20);
@@ -106,9 +107,15 @@ void cancel_touch(){gestures.cancel();fingers.clear();if(session&&session->app&&
 void key(InputSnapshot& s,u32 scan,u32 vk){s.scan_keys[scan]=128;s.virtual_keys[vk]=128;if(vk>=160&&vk<=165)s.virtual_keys[16+(vk-160)/2]=128;}
 }
 
-// Called from GameActivity (the ≡ button and the Back key).
+// Called from GameActivity (the ≡ / Esc buttons and the Back key).
 extern "C" JNIEXPORT void JNICALL Java_com_zun_th10_GameActivity_nativeTapEsc(JNIEnv*,jclass){
     ++escape_serial;
+}
+
+// Called from GameActivity: which black bar is the bomb zone. Mirrors the TH08
+// port: right-handed -> right bar, left-handed -> left bar.
+extern "C" JNIEXPORT void JNICALL Java_com_zun_th10_GameActivity_nativeSetHandedness(JNIEnv*,jclass,jint leftHanded){
+    bomb_side=leftHanded?-1:1;
 }
 
 namespace {
@@ -178,20 +185,25 @@ void log_diagnostics(){
 // which is pillarboxed inside the drawable (Renderer::picture).
 void touch_event(const SDL_Event& e){
     auto* r=sdl_renderer();if(!r)return;const auto& p=r->picture;if(p.width<=0||p.height<=0)return;
-    const float x=(e.tfinger.x*p.drawable_width-p.x)/p.width,y=(e.tfinger.y*p.drawable_height-p.y)/p.height;
+    // Deliberately NOT clamped to 0..1: a drag that runs into the black bar has
+    // to keep moving the target, and TouchController's playfield bounds stop the
+    // player at the edge. Clamping here made horizontal movement stop dead the
+    // moment the finger crossed into a bar.
+    const float x=(e.tfinger.x*p.drawable_width-p.x)/p.width;
+    const float y=(e.tfinger.y*p.drawable_height-p.y)/p.height;
     const bool down=e.type==SDL_FINGERDOWN, up=e.type==SDL_FINGERUP;
     const std::uint64_t now=SDL_GetTicks();
     if(down)fingers.insert(int(e.tfinger.fingerId));else if(up)fingers.erase(int(e.tfinger.fingerId));
     if(!fingers.empty())fire_until=host::seconds()+.18;   // 180 ms of shot after the last finger lifts
-    // Bomb zone: the black bar beside the 4:3 picture (right side only, so a
-    // left-thumb drag off the picture edge does not bomb by accident).
-    if(down&&p.width<p.drawable_width&&x>1.f){++bomb_serial;return;}
-    if(down&&x<0.f)return;                                // left bar: drag space, not a control
+    // Bomb: tap the black bar on the dominant-hand side (TH08 behaviour). The
+    // other bar stays drag space, and the overlay buttons are Java views on top
+    // of the surface, so pressing them never reaches this path.
+    if(down&&bomb_side!=0&&p.width<p.drawable_width){
+        if((bomb_side>0&&x>1.f)||(bomb_side<0&&x<0.f)){++bomb_serial;return;}
+    }
     const int type=down?0:up?2:1;
-    if(type==0&&(x<0||x>1||y<0||y>1))return;
     const bool key_slow=session&&session->input&&session->input->snapshot.virtual_keys[16]!=0;
-    gestures.pointer(type,int(e.tfinger.fingerId),std::clamp(x,0.f,1.f),std::clamp(y,0.f,1.f),
-                     now,touch_state(),key_slow);
+    gestures.pointer(type,int(e.tfinger.fingerId),x,y,now,touch_state(),key_slow);
 }
 
 // Builds the per-frame InputSnapshot: physical keyboard, then the touch gesture

@@ -16,6 +16,12 @@
 //   th10.debugKey    debug keystore used when th10.keystore is absent
 //   th10.minify      false (default) / true: R8 is the RAM-hungry step
 import java.util.Properties
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 
 plugins {
     id("com.android.application")
@@ -34,6 +40,42 @@ val appChannel = (prop("th10.channel") ?: "release").also {
 }
 val appVersion = prop("th10.versionName") ?: "1.0.0"
 val doMinify = (prop("th10.minify") ?: "false").toBoolean()
+
+// ---------------------------------------------------------------- bundled assets
+// The APK can carry game files inside assets/; the launcher unpacks them into the
+// app's external files folder on first "start game".
+//   th10.bundleFont     (default true)  -> msgothic.ttc  (public build: font only)
+//   th10.bundleGameData (default false) -> th10.dat + thbgm.dat ("-full" build)
+//   th10.data           source folder, default <workspace>/game-data/th10
+fun bundleSourceDir(): File = File(prop("th10.data") ?: File(portDir, "game-data/th10").path)
+
+fun bundledAssetFiles(): List<File> {
+    val dir = bundleSourceDir()
+    val out = mutableListOf<File>()
+    fun add(name: String) {
+        val f = File(dir, name)
+        if (f.isFile) out.add(f) else throw GradleException("th10.data: $name not found in $dir")
+    }
+    if ((prop("th10.bundleFont") ?: "true").toBoolean()) add("msgothic.ttc")
+    if ((prop("th10.bundleGameData") ?: "false").toBoolean()) {
+        add("th10.dat")
+        add("thbgm.dat")
+    }
+    return out
+}
+
+abstract class BundledAssets : DefaultTask() {
+    @get:InputFiles abstract val files: ConfigurableFileCollection
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        out.mkdirs()
+        files.files.forEach { it.copyTo(File(out, it.name.lowercase()), overwrite = true) }
+    }
+}
 
 // Release keystore from keystore.properties (values stay in Gradle memory), else the throwaway debug key.
 fun keyConfig(): Map<String, Any> {
@@ -132,10 +174,22 @@ android {
         }
     }
 
-    // Stored .so (extractNativeLibs=false); nothing uncompressed in assets.
+    // Stored .so (extractNativeLibs=false); game data / fonts stay uncompressed so
+    // the first-launch unpack is a straight copy and openFd() can report sizes.
     packaging { jniLibs { useLegacyPackaging = false } }
+    androidResources { noCompress += listOf("dat", "ttc") }
 
     lint { checkReleaseBuilds = false; abortOnError = false }
+}
+
+androidComponents {
+    onVariants { v ->
+        val cap = v.name.replaceFirstChar { it.uppercase() }
+        val assets = tasks.register<BundledAssets>("bundledAssets$cap") {
+            files.from(bundledAssetFiles())
+        }
+        v.sources.assets?.addGeneratedSourceDirectory(assets, BundledAssets::outputDir)
+    }
 }
 
 dependencies { }

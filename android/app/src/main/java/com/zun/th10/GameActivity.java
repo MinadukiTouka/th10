@@ -1,5 +1,7 @@
 package com.zun.th10;
 
+import android.content.SharedPreferences;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -25,15 +27,24 @@ import org.libsdl.app.SDLActivity;
  * plain Android views on top of SDL's SurfaceView, because drawing UI in the
  * ported renderer would mean adding a whole 2D path to it.
  *
- *   pause button  sends Escape to the game for a few frames (pause / back / cancel)
- *   quit button   ends the activity (the game writes saves as it goes)
+ *   "≡"    sends Escape (pause / back / cancel)
+ *   "Esc"  same thing, as a round button that says what it does
  *
- * Four-finger tap also sends Escape (see TouchController in the engine); the
- * buttons exist because that gesture is unusable mid-dodge.
+ * There is no quit button on purpose: leaving the game is Home, and the pause
+ * menu has "return to title". The overlay sits in the corner of the dominant
+ * hand (right-handed: top-left, left-handed: top-right), matching the TH08 port.
  */
 public class GameActivity extends SDLActivity {
     /** Called from Java: queue an Escape key press for the game. */
     private static native void nativeTapEsc();
+
+    /** 1 = left-handed: the bomb bar and the overlay move to the left side. */
+    private static native void nativeSetHandedness(int leftHanded);
+
+    private static final String PREFS = "port";
+    private static final String KEY_LEFT_HANDED = "left_handed";
+
+    private LinearLayout overlay;
 
     /**
      * Guard for the (unlikely) case that the native libraries failed to load:
@@ -44,6 +55,18 @@ public class GameActivity extends SDLActivity {
             nativeTapEsc();
         } catch (Throwable ignored) {
         }
+    }
+
+    private static void pushHandedness(boolean leftHanded) {
+        try {
+            nativeSetHandedness(leftHanded ? 1 : 0);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private boolean isLeftHanded() {
+        SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
+        return p.getBoolean(KEY_LEFT_HANDED, false);
     }
 
     @Override
@@ -57,6 +80,9 @@ public class GameActivity extends SDLActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // The launcher can change the handedness while the game task is alive.
+        pushHandedness(isLeftHanded());
+        placeOverlay();
         requestDisplayRefreshRate();
     }
 
@@ -88,26 +114,42 @@ public class GameActivity extends SDLActivity {
     private void addOverlay() {
         if (mLayout == null) return;
 
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
+        overlay = new LinearLayout(this);
+        overlay.setOrientation(LinearLayout.HORIZONTAL);
 
         Button esc = overlayButton("\u2261");   // identical-to: a "menu" glyph
         esc.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { tapEsc(); }
         });
-        Button quit = overlayButton("\u2715");  // multiplication x
-        quit.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { requestFinish(); }
+        Button escRound = roundEscButton();
+        escRound.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { tapEsc(); }
         });
-        bar.addView(esc);
-        bar.addView(quit);
+        overlay.addView(esc);
+        overlay.addView(escRound);
 
+        mLayout.addView(overlay, overlayParams());
+        overlay.bringToFront();
+        pushHandedness(isLeftHanded());
+    }
+
+    /** Put the overlay in the top corner of the dominant hand. */
+    private void placeOverlay() {
+        if (overlay == null) return;
+        overlay.setLayoutParams(overlayParams());
+        overlay.bringToFront();
+    }
+
+    private RelativeLayout.LayoutParams overlayParams() {
         int margin = dp(6);
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        params.addRule(isLeftHanded()
+                ? RelativeLayout.ALIGN_PARENT_RIGHT
+                : RelativeLayout.ALIGN_PARENT_LEFT);
         params.setMargins(margin, margin, margin, margin);
-        mLayout.addView(bar, params);
-        bar.bringToFront();
+        return params;
     }
 
     private Button overlayButton(String label) {
@@ -125,6 +167,31 @@ public class GameActivity extends SDLActivity {
         b.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(44), dp(40));
         lp.rightMargin = dp(2);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** Round outlined button with the word "Esc" inside; same action as Escape. */
+    private Button roundEscButton() {
+        Button b = new Button(this);
+        b.setText("Esc");
+        b.setAllCaps(false);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+        b.setTextColor(0xE6FFFFFF);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(0x40000000);
+        circle.setStroke(Math.max(1, dp(2)), 0xCCFFFFFF);
+        b.setBackground(circle);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        b.setGravity(Gravity.CENTER);
+        int size = dp(56);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        lp.leftMargin = dp(4);
         b.setLayoutParams(lp);
         return b;
     }
