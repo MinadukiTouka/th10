@@ -1,10 +1,13 @@
 package com.zun.th10;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -48,6 +51,38 @@ public class GameActivity extends SDLActivity {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         addOverlay();
+        requestDisplayRefreshRate();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        requestDisplayRefreshRate();
+    }
+
+    /**
+     * Ask the panel to run at 60 Hz. Mountain of Faith's logic is a 60 Hz frame
+     * clock; on a 90/120 Hz panel the loop can only present each game frame once
+     * per display refresh, which either wastes frames or (with a naive loop) runs
+     * the game fast. Asking for a fixed 60 Hz source matches the PC original and
+     * the TH08 port's behaviour.
+     */
+    private void requestDisplayRefreshRate() {
+        if (Build.VERSION.SDK_INT < 30) return;
+        final long[] delays = {600, 2000};
+        for (final long delay : delays) {
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override public void run() {
+                    try {
+                        Surface surface = (mSurface != null) ? mSurface.getHolder().getSurface() : null;
+                        if (surface != null && surface.isValid()) {
+                            surface.setFrameRate(60f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }, delay);
+        }
     }
 
     private void addOverlay() {
@@ -124,6 +159,20 @@ public class GameActivity extends SDLActivity {
     @Override
     public void onBackPressed() {
         tapEsc();
+    }
+
+    /**
+     * SDL's SurfaceView consumes KEYCODE_BACK before the activity sees it, so
+     * {@link #onBackPressed()} alone never runs. Intercept the key on the way in
+     * and turn it into the game's Escape.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_UP) tapEsc();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     private int dp(int value) {

@@ -13,6 +13,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "../portable/sdl/third_party/miniaudio.h"
 #include <SDL.h>
+#include "Platform.hpp"
 #include "../platform/Audio.hpp"
 #include <algorithm>
 #include <array>
@@ -55,8 +56,18 @@ struct Host {
         // DirectSound changes are immediate; do not add miniaudio's default
         // short gain ramp to the game's own fades.
         cfg.defaultVolumeSmoothTimeInPCMFrames=0;
-        if(ma_engine_init(&cfg,&engine)!=MA_SUCCESS){error=1;return false;}
-        if(SDL_InitSubSystem(SDL_INIT_AUDIO)==0){SDL_AudioSpec want{},have{};want.freq=44100;want.format=AUDIO_F32SYS;want.channels=2;want.samples=2048;device=SDL_OpenAudioDevice(nullptr,0,&want,&have,0);}
+        if(ma_engine_init(&cfg,&engine)!=MA_SUCCESS){error=1;th10::host::log("audio: miniaudio engine init failed");return false;}
+        const int audio_init=SDL_InitSubSystem(SDL_INIT_AUDIO);
+        if(audio_init==0){
+            SDL_AudioSpec want{},have{};want.freq=44100;want.format=AUDIO_F32SYS;want.channels=2;want.samples=2048;
+            device=SDL_OpenAudioDevice(nullptr,0,&want,&have,0);
+            if(device)th10::host::log("audio: SDL driver '%s', %d Hz, %d ch",
+                SDL_GetCurrentAudioDriver()?SDL_GetCurrentAudioDriver():"?",
+                have.freq,have.channels);
+            else th10::host::log("audio: SDL_OpenAudioDevice failed: %s",SDL_GetError());
+        }else{
+            th10::host::log("audio: SDL_InitSubSystem(AUDIO) failed: %s",SDL_GetError());
+        }
         if(!device){ma_engine_uninit(&engine);error=2;return false;}
         ready=true;paused=false;SDL_PauseAudioDevice(device,0);return true;
     }

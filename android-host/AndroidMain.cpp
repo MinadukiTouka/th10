@@ -151,12 +151,15 @@ void fatal(const std::string& message){
 // which GPU, which audio driver, which font" without needing another build.
 void log_diagnostics(){
     const auto& p=host::paths();
-    for(const char* name:{"th10.dat","thbgm.dat","msgothic.ttc","scoreth10.dat","th10.cfg"}){
-        const auto path=p.data_file(name);
+    struct Entry {const char* name;bool save;};
+    const Entry entries[]={{"th10.dat",false},{"thbgm.dat",false},{"msgothic.ttc",false},
+                           {"scoreth10.dat",true},{"th10.cfg",true}};
+    for(const Entry& e:entries){
+        const auto path=e.save?p.save_file(e.name):p.data_file(e.name);
         FILE* f=std::fopen(path.c_str(),"rb");
-        if(!f){host::log("data: %-13s missing",name);continue;}
+        if(!f){host::log("file: %-13s missing (%s)",e.name,e.save?"save":"data");continue;}
         std::fseek(f,0,SEEK_END);const long size=std::ftell(f);std::fclose(f);
-        host::log("data: %-13s %ld bytes",name,size);
+        host::log("file: %-13s %ld bytes (%s)",e.name,size,e.save?"save":"data");
     }
     if(const auto* vendor=reinterpret_cast<const char*>(glGetString(GL_VENDOR)))
         host::log("gl vendor: %s",vendor);
@@ -164,7 +167,8 @@ void log_diagnostics(){
         host::log("gl renderer: %s",renderer);
     if(const auto* version=reinterpret_cast<const char*>(glGetString(GL_VERSION)))
         host::log("gl version: %s",version);
-    host::log("audio driver: %s",SDL_GetCurrentAudioDriver()?SDL_GetCurrentAudioDriver():"(none)");
+    // SDL audio is initialised lazily on the first buffer, so the driver is not
+    // known yet here; AudioHost logs it when the device opens.
     int dw=0,dh=0;
     if(auto* r=sdl_renderer())SDL_GL_GetDrawableSize(r->sdl_window(),&dw,&dh);
     host::log("drawable: %dx%d",dw,dh);
@@ -204,6 +208,17 @@ void native_input(Application* app){
         snapshot.virtual_keys[16]!=0,snapshot.virtual_keys[37]||snapshot.virtual_keys[38]||snapshot.virtual_keys[39]||snapshot.virtual_keys[40]);
     for(const auto& k:keyboard_map)if(sample.keys[k.vk]||(k.vk>=160&&k.vk<=165&&sample.keys[16+(k.vk-160)/2]))key(snapshot,k.scan,k.vk);
     if(app->world)app->world->motion.target(sample.motion,sample.x,sample.y);
+    // Touch diagnostics: one line per second while a finger is down. Kept in the
+    // release build on purpose - it is the only way to see the mapped state on a
+    // device without a debugger, and it costs one branch per frame.
+    if(!fingers.empty()){
+        static u32 touch_frames=0;
+        if((++touch_frames%60)==0){
+            const auto ts=touch_state();
+            host::log("touch: ctx=%d ready=%d inst=%d pos=%.1f,%.1f motion=%d target=%.1f,%.1f",
+                ts.context,int(ts.ready),ts.instance,ts.x,ts.y,sample.motion,sample.x,sample.y);
+        }
+    }
 }
 }
 
@@ -224,14 +239,15 @@ int main(int,char**){
     log_diagnostics();
 
     constexpr double interval=touhou::sdl::FrameCadence::interval;
-    double debt=0,previous=host::seconds(),audio_remainder=0;
+    touhou::sdl::FrameCadence cadence;
+    double previous=host::seconds(),audio_remainder=0;
     bool running=true,foreground=true;int result=0;
     while(running&&!result){
         SDL_Event e;while(SDL_PollEvent(&e)){
             if(e.type==SDL_QUIT)running=false;
             else if(e.type==SDL_FINGERDOWN||e.type==SDL_FINGERUP||e.type==SDL_FINGERMOTION)touch_event(e);
             else if(e.type==SDL_APP_WILLENTERBACKGROUND){foreground=false;cancel_touch();sdl_audio_pause(1);}
-            else if(e.type==SDL_APP_DIDENTERFOREGROUND){foreground=true;previous=host::seconds();debt=0;sdl_audio_pause(0);}
+            else if(e.type==SDL_APP_DIDENTERFOREGROUND){foreground=true;previous=host::seconds();cadence.reset();sdl_audio_pause(0);}
             else if(e.type==SDL_WINDOWEVENT&&e.window.event==SDL_WINDOWEVENT_FOCUS_LOST){for(auto& k:keyboard_map)k.hosted=false;cancel_touch();}
         }
         if(!foreground){SDL_Delay(16);continue;}
@@ -244,10 +260,12 @@ int main(int,char**){
             const double deadline=host::seconds()+.012;
             do{app->world->advance_loading_step();}while(app->world->loading&&host::seconds()<deadline);
             app->sync_views();
-            if(app->world->loading){app->engine.device.present_frame();sdl_audio_pump();debt=0;continue;}
+            if(app->world->loading){app->engine.device.present_frame();sdl_audio_pump();cadence.reset();continue;}
         }
-        debt+=delta;u32 ticks=u32(std::floor((debt+interval*.5)/interval));ticks=std::min(4u,std::max(ticks,1u));
-        debt=std::clamp(debt-ticks*interval,-interval*.5,.1);
+        // The game's logic is 60 Hz. On a 90/120 Hz panel this returns 0 on the
+        // frames in between: skip the tick instead of running the game fast.
+        const u32 ticks=cadence.advance(delta);
+        if(!ticks){SDL_Delay(1);continue;}
         if(renderer)renderer->defer=true;
         const double started=host::seconds();
         for(u32 n=0;n<ticks&&!result;++n){native_input(app);result=app->step(true);}
@@ -257,6 +275,7 @@ int main(int,char**){
         timing.add(stepped-started,host::seconds()-stepped);if(timing.due())timing.report();
     }
     if(result==2){fatal("The game stopped with an error ("+std::to_string(app->error)+")");return 1;}
+    host::log("loop exit: result=%d running=%d quitting=%u",result,int(running),session?session->quitting:0u);
     session.reset();
     android_finish();
     SDL_Quit();
