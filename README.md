@@ -1,3 +1,20 @@
+# 東方風神録 Android 移植（本 fork 的改动）
+
+本仓库是 saekaze/th10-switch（Switch 原生移植，上游是 YomotsuHisami/th10 的
+clean-room C++ 重写）的 fork，新增了 **Android 后端**：SDL2 + OpenGL ES 3、
+触屏手势、`Download/th10` 数据目录、内置字体、启动器，以及公开包 / `-full`
+自用包两种构建。包名 `com.zun.th10`。
+
+- 构建：`ndk-build`（SDL2 + FreeType + 游戏 + host）→ Gradle → 签名 APK。
+  构建脚本与移植文档在工作区（不在本仓库）：`docs/`、`scripts/`、`tools/`。
+- 数据：公开包不含 `th10.dat` / `thbgm.dat`，由玩家自备，放到
+  `/sdcard/Download/th10/` 或 `/sdcard/Android/data/com.zun.th10/files/th10/`。
+- 触屏：按住拖动移动并射击，第二指低速；Bomb = 优势手一侧的黑边（右手右侧 /
+  左手左侧，可在启动器里切换）；≡ / 圆形 Esc / Back 键都是 Esc，没有退出按钮。
+- 许可：游戏与平台代码 MIT（见 `LICENSE-YomotsuHisami.txt`），Switch 专属文件 CC0；
+  本 Android 后端同样以 MIT 提供。**不包含任何原版游戏数据。**
+
+---
 # Touhou 10: Mountain of Faith — Nintendo Switch Port
 *(東方風神録　〜 Mountain of Faith)*
 
